@@ -1,0 +1,151 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>키워드로 장소 검색하고 마커 지우기</title>
+    <style>
+        .map_wrap, .map_wrap * {margin:0;padding:0;font-family:'Malgun Gothic',dotum,'돋움',sans-serif;font-size:12px;}
+        .map_wrap {position:relative;width:100%;height:600px;}
+        #menu_wrap {position:absolute;top:10px;left:10px;width:260px;padding:10px;background:rgba(255,255,255,0.9);z-index:1;border-radius:10px;}
+        #menu_wrap input {width:140px;}
+        #menu_wrap button {margin-top:5px;}
+        #placesList li {list-style:none;margin-bottom:10px;border-bottom:1px solid #ddd;padding-bottom:5px;}
+        .markerbg {display:inline-block;width:24px;height:24px;background:url('https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/marker_number_blue.png') no-repeat;}
+        .on {font-weight:bold;color:#777;}
+    </style>
+</head>
+<body>
+<div class="map_wrap">
+    <div id="map" style="width:100%;height:100%;"></div>
+
+    <div id="menu_wrap">
+        <form onsubmit="searchPlaces(); return false;">
+            키워드: <input type="text" id="keyword" value="장수군">
+            <button type="submit">검색</button>
+            <button type="button" onclick="removeMarker()">아이콘 지우기</button>
+        </form>
+        <ul id="placesList"></ul>
+        <div id="pagination"></div>
+    </div>
+</div>
+
+<script type="text/javascript" src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=94bf4516825c146467eb2318cd55b782&libraries=services"></script>
+<script>
+    var markers = [];
+
+    var mapContainer = document.getElementById('map'),
+        mapOption = {
+            center: new kakao.maps.LatLng(37.566826, 126.9786567),
+            level: 3
+        };
+
+    var map = new kakao.maps.Map(mapContainer, mapOption); 
+    var ps = new kakao.maps.services.Places();  
+    var infowindow = new kakao.maps.InfoWindow({zIndex:1});
+
+    function searchPlaces() {
+        var keyword = document.getElementById('keyword').value;
+        if (!keyword.trim()) {
+            alert('키워드를 입력해주세요!');
+            return;
+        }
+        ps.keywordSearch(keyword, placesSearchCB); 
+    }
+
+    function placesSearchCB(data, status, pagination) {
+        if (status === kakao.maps.services.Status.OK) {
+            displayPlaces(data);
+            displayPagination(pagination);
+        } else if (status === kakao.maps.services.Status.ZERO_RESULT) {
+            alert('검색 결과가 없습니다.');
+        } else {
+            alert('검색 중 오류 발생');
+        }
+    }
+
+    function displayPlaces(places) {
+        var listEl = document.getElementById('placesList'),
+            bounds = new kakao.maps.LatLngBounds(); 
+        listEl.innerHTML = '';
+        removeMarker();
+
+        for (var i = 0; i < places.length; i++) {
+            var placePos = new kakao.maps.LatLng(places[i].y, places[i].x),
+                marker = addMarker(placePos, i),
+                itemEl = document.createElement('li');
+
+            bounds.extend(placePos);
+            itemEl.innerHTML = '<span class="markerbg" style="background-position:0 -' + (i*36+10) + 'px"></span> ' + places[i].place_name;
+            itemEl.onmouseover = (function(marker, title) {
+                return function() {
+                    displayInfowindow(marker, title);
+                };
+            })(marker, places[i].place_name);
+            itemEl.onmouseout = function() {
+                infowindow.close();
+            };
+            listEl.appendChild(itemEl);
+        }
+        map.setBounds(bounds);
+    }
+
+    function addMarker(position, idx) {
+        var spriteY = (idx * 46) + 10;
+        var imageSrc = 'https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/marker_number_blue.png',
+            imageSize = new kakao.maps.Size(36, 37),
+            imgOptions = {
+                spriteSize: new kakao.maps.Size(36, 691),
+                spriteOrigin: new kakao.maps.Point(0, spriteY),
+                offset: new kakao.maps.Point(13, 37)
+            },
+            markerImage = new kakao.maps.MarkerImage(imageSrc, imageSize, imgOptions);
+
+        var marker = new kakao.maps.Marker({
+            position: position,
+            image: markerImage
+        });
+        marker.setMap(map);
+        markers.push(marker);
+        return marker;
+    }
+
+    function removeMarker() {
+        for (var i = 0; i < markers.length; i++) {
+            markers[i].setMap(null);
+        }
+        markers = [];
+        document.getElementById('placesList').innerHTML = '';
+        document.getElementById('pagination').innerHTML = '';
+    }
+
+    function displayInfowindow(marker, title) {
+        infowindow.setContent('<div style="padding:5px;">' + title + '</div>');
+        infowindow.open(map, marker);
+    }
+
+    function displayPagination(pagination) {
+        var paginationEl = document.getElementById('pagination'),
+            fragment = document.createDocumentFragment();
+
+        paginationEl.innerHTML = '';
+        for (var i = 1; i <= pagination.last; i++) {
+            var el = document.createElement('a');
+            el.href = "#";
+            el.innerHTML = i;
+            if (i === pagination.current) {
+                el.className = 'on';
+            } else {
+                el.onclick = (function(i) {
+                    return function() {
+                        pagination.gotoPage(i);
+                    }
+                })(i);
+            }
+            fragment.appendChild(el);
+        }
+        paginationEl.appendChild(fragment);
+    }
+</script>
+</body>
+</html>
